@@ -49,12 +49,9 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             LeaveCriticalSection(&clientsLock);
             break;
         }
-        std::cout << "Client: " << buffer << std::endl;
+        std::cout << "Client: " << buffer << std::endl; //Temperory
 
-        User newUser;
         char response[BUFFER_SIZE];
-        char token[50];
-        int field = 0;
 
         std::stringstream ss(buffer);
         std::string segment;
@@ -66,7 +63,7 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
         if (segment == "0")
         {
             // add user
-            
+
             // Extract and assign data
             getline(ss, user.First_Name, ';');
             getline(ss, user.Middle_Name, ';');
@@ -82,7 +79,11 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             getline(ss, user.Phone_Number, ';');
             getline(ss, user.Password, ';');
 
-            // Display extracted data
+            // Validate the Data
+
+            // Assign number or ID
+
+            // Display extracted data (temp)
             std::cout << "First Name: " << user.First_Name << std::endl;
             std::cout << "Middle Name: " << user.Middle_Name << std::endl;
             std::cout << "User Data Extracted:\n";
@@ -97,20 +98,15 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             std::ofstream file("users.txt", std::ios::app);
             if (file.is_open())
             {
-                file << newUser.First_Name << "," << newUser.Middle_Name << "," << newUser.Last_Name << ","
-                     << newUser.DOB << "," << newUser.Age << "," << newUser.Gender << ","
-                     << newUser.Phone_Number << "," << newUser.Password << "\n";
+                file << user.First_Name << "," << user.Middle_Name << "," << user.Last_Name << "," << user.DOB << "," << user.Age << "," << user.Gender << "," << user.Phone_Number << "," << user.Password << ",\n";
                 file.close();
-                strcpy(response, "User added successfully.");
+                strcpy(response, "2");
             }
             else
             {
-                strcpy(response, "Error storing user.");
+                strcpy(response, "1");
             }
             send(client, response, BUFFER_SIZE, 0);
-            // assign number or ID
-            // Store Data
-            break;
         }
 
         // }
