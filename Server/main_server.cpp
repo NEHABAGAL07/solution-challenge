@@ -66,7 +66,7 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
         if (segment == "0")
         {
             // add user
-//temperory
+            
             // Extract and assign data
             getline(ss, user.First_Name, ';');
             getline(ss, user.Middle_Name, ';');
