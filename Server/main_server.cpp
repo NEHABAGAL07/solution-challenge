@@ -10,6 +10,8 @@
 #include <ws2tcpip.h>
 #include <vector>
 #include <algorithm>
+#include <regex>
+#include <ctime>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -80,13 +82,26 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             getline(ss, user.Password, ';');
 
             // Validate the Data
+            if (user.First_Name.length()>50)
+            {
+                strcpy(response,"First_Name_Too_Long;");
+            }
+            if (user.Middle_Name.length()>50)
+            {
+                strcpy(response,"Middle_Name_Too_Long;");
+            }
+            if (user.Last_Name.length()>50)
+            {
+                strcpy(response,"Last_Name_Too_Long;");
+            }
+            
 
             // Assign number or ID
 
             // Display extracted data (temp)
+            std::cout << "User Data Extracted:\n";
             std::cout << "First Name: " << user.First_Name << std::endl;
             std::cout << "Middle Name: " << user.Middle_Name << std::endl;
-            std::cout << "User Data Extracted:\n";
             std::cout << "Last Name: " << user.Last_Name << std::endl;
             std::cout << "DOB: " << user.DOB << std::endl;
             std::cout << "Age: " << user.Age << std::endl;
@@ -100,11 +115,11 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             {
                 file << user.First_Name << "," << user.Middle_Name << "," << user.Last_Name << "," << user.DOB << "," << user.Age << "," << user.Gender << "," << user.Phone_Number << "," << user.Password << ",\n";
                 file.close();
-                strcpy(response, "2");
+                strcpy(response, "User_Added");
             }
             else
             {
-                strcpy(response, "1");
+                strcpy(response, "Failed_To_Open_File");
             }
             send(client, response, BUFFER_SIZE, 0);
         }
@@ -146,6 +161,30 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
     }
     return 0;
 }
+
+bool isValidName(const std::string& name) {
+    if (name.empty() || name.length() > 50) return false;
+    return std::all_of(name.begin(), name.end(), [](char c) { return isalpha(c) || c == ' '; });
+}
+
+bool isValidDOB(const std::string& dob) {
+    std::regex dobPattern(R"(\d{4}-\d{2}-\d{2})"); // YYYY-MM-DD format
+    if (!std::regex_match(dob, dobPattern)) return false;
+
+    int year, month, day;
+    sscanf(dob.c_str(), "%d-%d-%d", &year, &month, &day);
+
+    time_t t = time(nullptr);
+    tm* now = localtime(&t);
+    int currentYear = now->tm_year + 1900;
+
+    if (year < 1900 || year > currentYear) return false; // Year validation
+    if (month < 1 || month > 12) return false; // Month validation
+    if (day < 1 || day > 31) return false; // Day validation
+
+    return true;
+}
+
 
 void startServer()
 {
