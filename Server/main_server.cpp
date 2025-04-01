@@ -10,6 +10,8 @@
 #include <ws2tcpip.h>
 #include <vector>
 #include <algorithm>
+#include <regex>
+#include <ctime>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -32,6 +34,70 @@ struct User
     std::string Password;
 };
 
+bool isValidName(const std::string &name)
+{
+    if (name.empty() || name.length() > 50)
+        return false;
+    return std::all_of(name.begin(), name.end(), [](char c)
+                       { return isalpha(c) || c == ' '; });
+}
+
+bool isValidDOB(const std::string &dob)
+{
+    std::regex dobPattern(R"(\d{4}-\d{2}-\d{2})"); // YYYY-MM-DD format
+    if (!std::regex_match(dob, dobPattern))
+        return false;
+
+    int year, month, day;
+    sscanf(dob.c_str(), "%d-%d-%d", &year, &month, &day);
+
+    time_t t = time(nullptr);
+    tm *now = localtime(&t);
+    int currentYear = now->tm_year + 1900;
+
+    if (year < 1900 || year > currentYear)
+        return false; // Year validation
+    if (month < 1 || month > 12)
+        return false; // Month validation
+    if (day < 1 || day > 31)
+        return false; // Day validation
+
+    return true;
+}
+
+bool isValidAge(int age)
+{
+    return (age >= 1 && age <= 120);
+}
+
+bool isValidGender(char gender)
+{
+    return (gender == 'M' || gender == 'F' || gender == 'O');
+}
+
+bool isValidPhoneNumber(const std::string &phone)
+{
+    if (phone.length() < 10 || phone.length() > 15)
+        return false;
+    return std::all_of(phone.begin(), phone.end(), ::isdigit);
+}
+
+bool isValidPassword(const std::string &password)
+{
+    if (password.length() < 8)
+        return false;
+
+    std::regex uppercase(R"([A-Z])");
+    std::regex lowercase(R"([a-z])");
+    std::regex digit(R"(\d)");
+    std::regex specialChar(R"([!@#$%^&*])");
+
+    return std::regex_search(password, uppercase) &&
+           std::regex_search(password, lowercase) &&
+           std::regex_search(password, digit) &&
+           std::regex_search(password, specialChar);
+}
+
 DWORD WINAPI handleClient(LPVOID clientSocket)
 {
     SOCKET client = *(SOCKET *)clientSocket;
@@ -49,12 +115,9 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             LeaveCriticalSection(&clientsLock);
             break;
         }
-        std::cout << "Client: " << buffer << std::endl;
+        std::cout << "Client: " << buffer << std::endl; // Temperory
 
-        User newUser;
         char response[BUFFER_SIZE];
-        char token[50];
-        int field = 0;
 
         std::stringstream ss(buffer);
         std::string segment;
@@ -66,7 +129,7 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
         if (segment == "0")
         {
             // add user
-//temperory
+
             // Extract and assign data
             getline(ss, user.First_Name, ';');
             getline(ss, user.Middle_Name, ';');
@@ -74,18 +137,63 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             getline(ss, user.DOB, ';');
 
             getline(ss, segment, ';');
-            user.Age = stoi(segment); // Convert age to int
+            user.Age = stoi(segment);
 
             getline(ss, segment, ';');
-            user.Gender = segment[0]; // Get first character for Gender
+            user.Gender = segment[0];
 
             getline(ss, user.Phone_Number, ';');
             getline(ss, user.Password, ';');
 
-            // Display extracted data
+            // Validate the Data
+            if (!isValidName(user.First_Name))
+            {
+                strcpy(response, "Invalid_First_Name");
+            }
+            else if (!isValidDOB(user.DOB))
+            {
+                strcpy(response, "Invalid_DOB");
+            }
+            else if (!isValidAge(user.Age))
+            {
+                strcpy(response, "Invalid_Age");
+            }
+            else if (!isValidGender(user.Gender))
+            {
+                strcpy(response, "Invalid_Gender");
+            }
+            else if (!isValidPhoneNumber(user.Phone_Number))
+            {
+                strcpy(response, "Invalid_Phone_Number");
+            }
+            else if (!isValidPassword(user.Password))
+            {
+                strcpy(response, "Weak_Password");
+            }
+
+            // Assign number or ID
+            std::fstream file1("users.txt");
+            std::string line, lastLine;
+
+            while (getline(file1, line))
+            {
+                lastLine = line;
+            }
+
+            if (lastLine.empty())
+                user.ID = 1;
+
+            std::stringstream ss(lastLine);
+            std::string idStr;
+            getline(ss, idStr, ',');
+            user.ID = stoi(idStr) + 1;
+            file1.close();
+
+            // Display extracted data (temp)
+            std::cout << "User Data Extracted:\n";
+            std::cout << "ID : " << user.ID << std::endl;
             std::cout << "First Name: " << user.First_Name << std::endl;
             std::cout << "Middle Name: " << user.Middle_Name << std::endl;
-            std::cout << "User Data Extracted:\n";
             std::cout << "Last Name: " << user.Last_Name << std::endl;
             std::cout << "DOB: " << user.DOB << std::endl;
             std::cout << "Age: " << user.Age << std::endl;
@@ -97,20 +205,15 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             std::ofstream file("users.txt", std::ios::app);
             if (file.is_open())
             {
-                file << newUser.First_Name << "," << newUser.Middle_Name << "," << newUser.Last_Name << ","
-                     << newUser.DOB << "," << newUser.Age << "," << newUser.Gender << ","
-                     << newUser.Phone_Number << "," << newUser.Password << "\n";
+                file << std::to_string(user.ID) << "," << user.First_Name << "," << user.Middle_Name << "," << user.Last_Name << "," << user.DOB << "," << user.Age << "," << user.Gender << "," << user.Phone_Number << "," << user.Password << ",\n";
                 file.close();
-                strcpy(response, "User added successfully.");
+                strcpy(response, "User_Added");
             }
             else
             {
-                strcpy(response, "Error storing user.");
+                strcpy(response, "Failed_To_Open_File");
             }
             send(client, response, BUFFER_SIZE, 0);
-            // assign number or ID
-            // Store Data
-            break;
         }
 
         // }
