@@ -31,6 +31,14 @@ struct User
     int Age;
     char Gender;
     std::string Phone_Number;
+    std::string User_Name;
+    std::string Password;
+};
+
+struct Auth
+{
+    int ID;
+    std::string User_Name;
     std::string Password;
 };
 
@@ -92,11 +100,19 @@ bool isValidPassword(const std::string &password)
     std::regex digit(R"(\d)");
     std::regex specialChar(R"([!@#$%^&*])");
 
-    return std::regex_search(password, uppercase) &&
-           std::regex_search(password, lowercase) &&
-           std::regex_search(password, digit) &&
-           std::regex_search(password, specialChar);
+    return std::regex_search(password, uppercase) && std::regex_search(password, lowercase) && std::regex_search(password, digit) && std::regex_search(password, specialChar);
 }
+
+std::string create_Response(const User &user) {
+    std::ostringstream ss;
+    ss << user.ID << "," << user.First_Name << "," << user.Middle_Name << ","
+       << user.Last_Name << "," << user.DOB << "," << user.Age << ","
+       << user.Gender << "," << user.Phone_Number << "," << user.User_Name << ","
+       << user.Password;
+    
+    return ss.str();
+}
+
 
 DWORD WINAPI handleClient(LPVOID clientSocket)
 {
@@ -122,6 +138,7 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
         std::stringstream ss(buffer);
         std::string segment;
         User user;
+        Auth auth;
 
         // Ignore the first token (process identifier)
         getline(ss, segment, ';');
@@ -143,6 +160,7 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             user.Gender = segment[0];
 
             getline(ss, user.Phone_Number, ';');
+            getline(ss, user.User_Name, ';');
             getline(ss, user.Password, ';');
 
             // Validate the Data
@@ -172,22 +190,26 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             }
 
             // Assign number or ID
-            std::fstream file1("users.txt");
+            std::fstream file("users.txt");
             std::string line, lastLine;
 
-            while (getline(file1, line))
+            while (getline(file, line))
             {
                 lastLine = line;
             }
 
-            if (lastLine.empty())
-                user.ID = 1;
-
+            
             std::stringstream ss(lastLine);
             std::string idStr;
-            getline(ss, idStr, ',');
-            user.ID = stoi(idStr) + 1;
-            file1.close();
+            if (lastLine.empty())
+                user.ID = 1;
+            else
+            {
+                getline(ss, idStr, ',');
+                user.ID = stoi(idStr) + 1;
+            }
+                
+            file.close();
 
             // Display extracted data (temp)
             std::cout << "User Data Extracted:\n";
@@ -199,32 +221,121 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
             std::cout << "Age: " << user.Age << std::endl;
             std::cout << "Gender: " << user.Gender << std::endl;
             std::cout << "Phone: " << user.Phone_Number << std::endl;
+            std::cout << "User Name: " << user.User_Name << std::endl;
             std::cout << "Password: " << user.Password << std::endl;
 
             // Store the user in a file
-            std::ofstream file("users.txt", std::ios::app);
-            if (file.is_open())
+            std::ofstream file1("users.txt", std::ios::app);
+            std::ofstream file2("auths.txt", std::ios::app);
+
+            if (file1.is_open() && file2.is_open())
             {
-                file << std::to_string(user.ID) << "," << user.First_Name << "," << user.Middle_Name << "," << user.Last_Name << "," << user.DOB << "," << user.Age << "," << user.Gender << "," << user.Phone_Number << "," << user.Password << ",\n";
-                file.close();
+                file1 << std::to_string(user.ID) << "," << user.First_Name << "," << user.Middle_Name << "," << user.Last_Name << "," << user.DOB << "," << user.Age << "," << user.Gender << "," << user.Phone_Number << "," << user.User_Name << "," << user.Password << ",\n";
+                file2 << user.User_Name << "," << std::to_string(user.ID) << ",\n";
+
+                file1.close();
+                file2.close();
+
                 strcpy(response, "User_Added");
             }
             else
             {
                 strcpy(response, "Failed_To_Open_File");
             }
+
             send(client, response, BUFFER_SIZE, 0);
         }
 
-        // }
-        //     case 1:
-        //         // verify user
-        //             // extract data
-        //             // seach user
-        //             // get data
-        //             // create respone
-        //             // send data
-        //         break;
+        if (segment == "1")
+        {
+            // verify user
+
+            // extract data
+            getline(ss, auth.User_Name, ';');
+            getline(ss, auth.Password, ';');
+
+            // seach for user id
+            std::ifstream file("auths.txt");
+            std::string line, User_Name, ID;
+
+            while (getline(file, line))
+            {
+                std::stringstream ss1(line);
+                getline(ss1, User_Name, ',');
+
+                bool Found = User_Name==auth.User_Name;
+                if (Found)
+                {
+                    getline(ss1, ID, ',');
+                    auth.ID = stoi(ID);
+                    break;
+                }
+                else
+                {
+                    strcpy(response, "User_Not_Found");
+                }
+            }
+
+            file.close();
+
+            // get data
+            std::ifstream file1("users.txt");
+
+            while (getline(file1, line))
+            {
+                std::stringstream ss2(line);
+                getline(ss2, ID, ',');
+                
+                
+                user.ID = stoi(ID);
+                if (user.ID == auth.ID)
+                {
+                    getline(ss2, user.First_Name, ',');
+                    getline(ss2, user.Middle_Name, ',');
+                    getline(ss2, user.Last_Name, ',');
+                    getline(ss2, user.DOB, ',');
+
+                    getline(ss2, segment, ',');
+                    user.Age = stoi(segment);
+
+                    getline(ss2, segment, ',');
+                    user.Gender = segment[0];
+
+                    getline(ss2, user.Phone_Number, ',');
+                    getline(ss2, user.User_Name, ',');
+                    getline(ss2, user.Password, ',');
+
+                    break;
+                }
+            }
+
+            // Authenticate User
+            bool verified = false;
+
+            if (auth.User_Name == user.User_Name)
+            {
+                verified = true;
+            }else
+            strcpy(response, "User_Name_Didnt_Match");
+            
+            if (auth.Password == user.Password)
+            {
+                verified = true;
+            }else
+            strcpy(response, "Password_Didnt_Match");
+            
+            // create respone
+            if (verified)
+            {
+                std::string resStr = create_Response(user);
+                strncpy(response, resStr.c_str(), BUFFER_SIZE);
+            }
+
+            
+            // send data
+            std::cout << response << std::endl;
+            send(client, response, BUFFER_SIZE, 0);
+        }
 
         //     case 2:
         //         // get user health data
@@ -241,7 +352,6 @@ DWORD WINAPI handleClient(LPVOID clientSocket)
         //             // Get data
         //             // create Respone
         //             // send Data
-        //             send(client, response, BUFFER_SIZE, 0);
         //         break;
 
         //     default:
